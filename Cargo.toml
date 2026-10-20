@@ -1,0 +1,24 @@
+[package]
+name = "lsm-kv"
+version = "0.1.0"
+edition = "2024"
+description = "A mini LSM-Tree key-value storage engine in Rust"
+license = "MIT"
+readme = "README.md"
+keywords = ["lsm", "storage", "database", "key-value", "sstable"]
+categories = ["database-implementations"]
+# 运行时数据目录不参与打包（即使仓库还没建立索引也保证排除）
+exclude = ["/data", "/tmpdata"]
+
+[dependencies]
+crc32fast = "1.5.2"
+parking_lot = "0.12.5"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+# 基准测试只用到时间统计，不需要 plotters/rayon 那一套，故关掉默认特性
+criterion = { version = "0.5", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "lsm"
+harness = false

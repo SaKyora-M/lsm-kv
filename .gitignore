@@ -1,0 +1,15 @@
+# Rust 构建产物
+/target/
+**/*.rs.bk
+
+# 运行时数据目录（CLI / 示例 / 测试产生的 SSTable 与 WAL）
+/data/
+/tmpdata/
+*.sst
+*.log
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
