@@ -1,20 +1,11 @@
-//! 阶段④-4：mini-lsm 基准测试。
+//! 基准测试：写路径、读路径、compaction、并发读。
 //!
-//! 三条主线：
-//! 1. **写路径**：只进 memtable+WAL 的 `put`，以及会触发 flush 的 `put`
-//! 2. **读路径**：memtable 命中 / SSTable 命中 / 全 miss（Bloom 拦截）
-//! 3. **并发读**：同一份数据，1/2/4/8 线程并发读的吞吐对比（验证 RwLock 的读并行）
-//!
-//! 跑法：
-//! ```text
-//! cargo bench                 # 全部
-//! cargo bench -- get_hit      # 只跑名字含 get_hit 的
-//! cargo bench -- --quick      # 快速模式（样本更少，数字略粗糙）
-//! ```
+//! 跑法：`cargo bench`（全部）、`cargo bench -- get_hit`（按名字过滤）、
+//! `cargo bench -- --quick`（样本更少，数字略粗糙）。
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use lsm_kv::Db;
 
 /// 基准数据集里的 key 数量。
@@ -68,7 +59,8 @@ fn bench_write(c: &mut Criterion) {
         let (_dir, db) = db_empty();
         let mut i = 0usize;
         b.iter(|| {
-            db.put(black_box(&keys[i % N]), black_box(&vals[i % N])).unwrap();
+            db.put(black_box(&keys[i % N]), black_box(&vals[i % N]))
+                .unwrap();
             i += 1;
         });
     });
@@ -79,7 +71,8 @@ fn bench_write(c: &mut Criterion) {
         db.set_flush_threshold(256 * 1024);
         let mut i = 0usize;
         b.iter(|| {
-            db.put(black_box(&keys[i % N]), black_box(&vals[i % N])).unwrap();
+            db.put(black_box(&keys[i % N]), black_box(&vals[i % N]))
+                .unwrap();
             i += 1;
         });
     });
@@ -88,8 +81,9 @@ fn bench_write(c: &mut Criterion) {
 
     // 批量写：100 条记录共用一个 WAL 缓冲区，只做一次系统调用
     const BATCH: usize = 100;
-    let batch: Vec<(&[u8], &[u8])> =
-        (0..BATCH).map(|j| (keys[j].as_slice(), vals[j].as_slice())).collect();
+    let batch: Vec<(&[u8], &[u8])> = (0..BATCH)
+        .map(|j| (keys[j].as_slice(), vals[j].as_slice()))
+        .collect();
 
     let mut gb = c.benchmark_group("write_batch");
     gb.throughput(Throughput::Elements(BATCH as u64));
@@ -183,21 +177,25 @@ fn bench_concurrent_read(c: &mut Criterion) {
     // 这样 1/2/4/8 线程的数字可以直接横向比较。
     for threads in [1usize, 2, 4, 8] {
         g.throughput(Throughput::Elements((threads * 200) as u64));
-        g.bench_with_input(BenchmarkId::from_parameter(threads), &threads, |b, &threads| {
-            b.iter(|| {
-                std::thread::scope(|s| {
-                    for t in 0..threads {
-                        let db = &db;
-                        s.spawn(move || {
-                            for i in 0..200 {
-                                let k = key((t * 200 + i) % N);
-                                black_box(db.get(black_box(&k)).unwrap());
-                            }
-                        });
-                    }
+        g.bench_with_input(
+            BenchmarkId::from_parameter(threads),
+            &threads,
+            |b, &threads| {
+                b.iter(|| {
+                    std::thread::scope(|s| {
+                        for t in 0..threads {
+                            let db = &db;
+                            s.spawn(move || {
+                                for i in 0..200 {
+                                    let k = key((t * 200 + i) % N);
+                                    black_box(db.get(black_box(&k)).unwrap());
+                                }
+                            });
+                        }
+                    });
                 });
-            });
-        });
+            },
+        );
     }
 
     g.finish();
@@ -214,21 +212,25 @@ fn bench_concurrent_read_memtable(c: &mut Criterion) {
     // 每线程 5000 次读（约 1ms/线程），把线程创建开销摊薄到 5% 以内
     for threads in [1usize, 2, 4, 8] {
         g.throughput(Throughput::Elements((threads * 5000) as u64));
-        g.bench_with_input(BenchmarkId::from_parameter(threads), &threads, |b, &threads| {
-            b.iter(|| {
-                std::thread::scope(|s| {
-                    for t in 0..threads {
-                        let db = &db;
-                        s.spawn(move || {
-                            for i in 0..5000 {
-                                let k = key((t * 5000 + i) % N);
-                                black_box(db.get(black_box(&k)).unwrap());
-                            }
-                        });
-                    }
+        g.bench_with_input(
+            BenchmarkId::from_parameter(threads),
+            &threads,
+            |b, &threads| {
+                b.iter(|| {
+                    std::thread::scope(|s| {
+                        for t in 0..threads {
+                            let db = &db;
+                            s.spawn(move || {
+                                for i in 0..5000 {
+                                    let k = key((t * 5000 + i) % N);
+                                    black_box(db.get(black_box(&k)).unwrap());
+                                }
+                            });
+                        }
+                    });
                 });
-            });
-        });
+            },
+        );
     }
 
     g.finish();

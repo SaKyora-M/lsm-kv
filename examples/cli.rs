@@ -11,7 +11,9 @@ use lsm_kv::Db;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 数据目录：优先用命令行第一个参数，否则默认 ./data
-    let dir = std::env::args().nth(1).unwrap_or_else(|| "./data".to_string());
+    let dir = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "./data".to_string());
 
     let db = Db::open(&dir)?;
     println!("mini-lsm 已打开，数据目录: {dir}");
@@ -27,7 +29,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
 
-        // 按空白切分输入，比如 "put a b" -> ["put", "a", "b"]
         let parts: Vec<&str> = line.trim().split_whitespace().collect();
         if parts.is_empty() {
             continue;

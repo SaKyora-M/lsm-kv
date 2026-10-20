@@ -29,7 +29,7 @@ fn persistence_survives_reopen() {
     // 第二次打开：数据应从 WAL 重放回来
     let db = Db::open(dir.path()).unwrap();
     assert_eq!(db.get(b"num").unwrap(), Some(b"42".to_vec())); // put 持久化了
-    assert_eq!(db.get(b"foo").unwrap(), None);                  // delete 也持久化了
+    assert_eq!(db.get(b"foo").unwrap(), None); // delete 也持久化了
 }
 
 #[test]
